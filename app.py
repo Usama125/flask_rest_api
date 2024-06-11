@@ -48,7 +48,7 @@ def download_document(document_url, filename, accept_header):
 def extract_financial_data_xbrl(xbrl_path):
     try:
         with open(xbrl_path, 'r', encoding='utf-8') as file:
-            soup = BeautifulSoup(file, 'lxml')  # Specify the lxml feature explicitly
+            soup = BeautifulSoup(file, features="xml")  # Specify the xml feature explicitly
         extracted_data = defaultdict(list)
         non_fraction_elements = soup.find_all(["ix:nonFraction", "ix:nonNumeric"])
         for element in non_fraction_elements:
@@ -73,6 +73,7 @@ def get_company_data():
     if not company_number:
         return jsonify({'error': 'Company number not found'}), 404
 
+    company_profile = get_company_profile(company_number)
     filing_history = get_filing_history(company_number)
 
     account_files = [file for file in filing_history.get('items', []) if file.get('category') == 'accounts']
@@ -85,7 +86,14 @@ def get_company_data():
             financial_data = extract_financial_data_xbrl(filename)
             os.remove(filename)
 
-    return jsonify(financial_data)
+    response_data = {
+        'financialData': financial_data,
+        'companyId': company_number,
+        'companyName': company_name,
+        'companyProfile': company_profile
+    }
+
+    return jsonify(response_data)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
