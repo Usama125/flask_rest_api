@@ -73,7 +73,6 @@ def get_company_data():
     if not company_number:
         return jsonify({'error': 'Company number not found'}), 404
 
-    company_profile = get_company_profile(company_number)
     filing_history = get_filing_history(company_number)
 
     account_files = [file for file in filing_history.get('items', []) if file.get('category') == 'accounts']
@@ -86,14 +85,7 @@ def get_company_data():
             financial_data = extract_financial_data_xbrl(filename)
             os.remove(filename)
 
-    response_data = {
-        'financialData': financial_data,
-        'companyId': company_number,
-        'companyName': company_name,
-        'companyProfile': company_profile
-    }
-
-    return jsonify(response_data)
+    return jsonify(financial_data)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
