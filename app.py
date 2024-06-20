@@ -1,12 +1,12 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # Import CORS
+from flask_cors import CORS
 import os
 import requests
 from bs4 import BeautifulSoup
 from collections import defaultdict
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS
+CORS(app)
 
 API_KEY = 'e609a0e7-8a14-4ebf-9ca9-d5ba6e6a3336'
 BASE_URL = 'https://api.company-information.service.gov.uk'
@@ -48,7 +48,7 @@ def download_document(document_url, filename, accept_header):
 def extract_financial_data_xbrl(xbrl_path):
     try:
         with open(xbrl_path, 'r', encoding='utf-8') as file:
-            soup = BeautifulSoup(file, features="xml")  # Specify the xml feature explicitly
+            soup = BeautifulSoup(file, features="xml")
         extracted_data = defaultdict(list)
         non_fraction_elements = soup.find_all(["ix:nonFraction", "ix:nonNumeric"])
         for element in non_fraction_elements:
@@ -75,6 +75,8 @@ def get_company_data():
 
     company_profile = get_company_profile(company_number)
     filing_history = get_filing_history(company_number)
+    officers = get_officers(company_number)
+    psc = get_psc(company_number)
 
     account_files = [file for file in filing_history.get('items', []) if file.get('category') == 'accounts']
     financial_data = {}
@@ -90,7 +92,9 @@ def get_company_data():
         'financialData': financial_data,
         'companyId': company_number,
         'companyName': company_name,
-        'companyProfile': company_profile
+        'companyProfile': company_profile,
+        'officers': officers,
+        'psc': psc
     }
 
     return jsonify(response_data)
