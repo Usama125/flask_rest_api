@@ -12,38 +12,73 @@ API_KEY = 'e609a0e7-8a14-4ebf-9ca9-d5ba6e6a3336'
 BASE_URL = 'https://api.company-information.service.gov.uk'
 
 def get_company_number(company_name):
-    response = requests.get(f'{BASE_URL}/search/companies', params={'q': company_name}, auth=(API_KEY, ''))
-    data = response.json()
-    if 'items' in data and len(data['items']) > 0:
-        return data['items'][0]['company_number']
-    return None
+    try:
+        response = requests.get(f'{BASE_URL}/search/companies', params={'q': company_name}, auth=(API_KEY, ''))
+        response.raise_for_status()
+        data = response.json()
+        if 'items' in data and len(data['items']) > 0:
+            return data['items'][0]['company_number']
+        return None
+    except requests.RequestException as e:
+        print(f"Error fetching company number: {e}")
+        return None
 
 def get_company_profile(company_number):
-    response = requests.get(f'{BASE_URL}/company/{company_number}', auth=(API_KEY, ''))
-    return response.json()
+    try:
+        response = requests.get(f'{BASE_URL}/company/{company_number}', auth=(API_KEY, ''))
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching company profile: {e}")
+        return None
 
 def get_filing_history(company_number):
-    response = requests.get(f'{BASE_URL}/company/{company_number}/filing-history', auth=(API_KEY, ''))
-    return response.json()
+    try:
+        response = requests.get(f'{BASE_URL}/company/{company_number}/filing-history', auth=(API_KEY, ''))
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching filing history: {e}")
+        return None
 
 def get_officers(company_number):
-    response = requests.get(f'{BASE_URL}/company/{company_number}/officers', auth=(API_KEY, ''))
-    return response.json()
+    try:
+        response = requests.get(f'{BASE_URL}/company/{company_number}/officers', auth=(API_KEY, ''))
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching officers: {e}")
+        return None
 
 def get_psc(company_number):
-    response = requests.get(f'{BASE_URL}/company/{company_number}/persons-with-significant-control', auth=(API_KEY, ''))
-    return response.json()
+    try:
+        response = requests.get(f'{BASE_URL}/company/{company_number}/persons-with-significant-control', auth=(API_KEY, ''))
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching PSC: {e}")
+        return None
 
 def get_document_metadata(document_url):
-    response = requests.get(document_url, auth=(API_KEY, ''))
-    return response.json()
+    try:
+        response = requests.get(document_url, auth=(API_KEY, ''))
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching document metadata: {e}")
+        return None
 
 def download_document(document_url, filename, accept_header):
-    response = requests.get(document_url, headers={'Accept': accept_header}, auth=(API_KEY, ''), stream=True)
-    with open(filename, 'wb') as file:
-        for chunk in response.iter_content(chunk_size=8192):
-            file.write(chunk)
-    return filename
+    try:
+        response = requests.get(document_url, headers={'Accept': accept_header}, auth=(API_KEY, ''), stream=True)
+        response.raise_for_status()
+        with open(filename, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+        return filename
+    except requests.RequestException as e:
+        print(f"Error downloading document: {e}")
+        return None
 
 def extract_financial_data_xbrl(xbrl_path):
     try:
@@ -60,7 +95,7 @@ def extract_financial_data_xbrl(xbrl_path):
         return extracted_data
     except Exception as e:
         print(f"Error extracting data from XBRL: {e}")
-        return None
+        return {}
 
 @app.route('/company', methods=['POST'])
 def get_company_data():
@@ -73,10 +108,10 @@ def get_company_data():
     if not company_number:
         return jsonify({'error': 'Company number not found'}), 404
 
-    company_profile = get_company_profile(company_number)
-    filing_history = get_filing_history(company_number)
-    officers = get_officers(company_number)
-    psc = get_psc(company_number)
+    company_profile = get_company_profile(company_number) or {}
+    filing_history = get_filing_history(company_number) or {}
+    officers = get_officers(company_number) or {}
+    psc = get_psc(company_number) or {}
 
     account_files = [file for file in filing_history.get('items', []) if file.get('category') == 'accounts']
     financial_data = {}
@@ -84,9 +119,10 @@ def get_company_data():
         metadata = get_document_metadata(account_files[0].get('links', {}).get('document_metadata'))
         if metadata and metadata.get('resources', {}).get('application/xhtml+xml'):
             filename = f"/tmp/{company_number}_account.xhtml"
-            download_document(metadata['links']['document'], filename, 'application/xhtml+xml')
-            financial_data = extract_financial_data_xbrl(filename)
-            os.remove(filename)
+            downloaded_file = download_document(metadata['links']['document'], filename, 'application/xhtml+xml')
+            if downloaded_file:
+                financial_data = extract_financial_data_xbrl(downloaded_file)
+                os.remove(downloaded_file)
 
     response_data = {
         'financialData': financial_data,
